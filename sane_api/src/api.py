@@ -1,49 +1,47 @@
 import inspect
 
 from rest_framework.viewsets import (ModelViewSet, ViewSet, )
+from rest_framework.response import Response
+from rest_framework import status
+
+def get_snake_case(data):
+	return data.lower().replace(" ", "_")
 
 class SaneAPIMixin:
-    def _get_action_name(self, view):
-        return view.action or request.method.lower()
+	def _get_action_name(self, view):
+		return view.action or request.method.lower()
 
-    def _get_authorizer(self, request, view, obj = None):
-        user = request.user
-        instance = obj || view
-        action_name = self._get_action_name(view)
+	def _get_authorizer(self, request, view, obj = None):
+		instance = obj || view
+		action_name = self._get_action_name(view)
 
-        methods = inspect.getmembers(instance, predicate=inspect.ismethod)
-        pattern = r"_{}".format(action_name)
-        possible_authorizers = \
-            filter(lambda method: re.match(pattern, method[0]), methods)
+		try:
+			return getattr(instance, "can_{}".format(action_name))
+		except AttributeError as e:
+			return None
 
-        if len(possible_authorizers) == 0:
-            return None
+	def has_permission(self, request, view):
+		authorizer = self._get_authorizer(self, request, view)
+		return authorizer and not not authorizer(request.user, request):
 
-        try:
-            return getattr(instance, "can_{}".format(action_name))
-        except AttributeError as e:
-            for authorizer in possible_authorizers:
-                for group in user.groups.all():
-                    pass
+	def has_object_permission(self, request, view, obj):
+		authorizer = self._get_authorizer(self, request, view, obj)
+		return authorizer and not not authorizer(request.user, request):
 
-        return None
-
-
-    def has_permission(self, request, view):
-        authorizer = self._get_authorizer(self, request, view)
-        return authorizer and not not authorizer(request):
-
-
-    def has_object_permission(self, request, view, obj):
-        authorizer = self._get_authorizer(self, request, view, obj)
-        return authorizer and not not authorizer(request):
-
-    def get_queryset(self):
-        pass
-
+	def get_serializer_class(self):
+		# resolve serializers based upon the versions of api
+		pass
 
 class SaneModelAPI(SaneAPIMixin, ModelViewSet):
-    pass
+	def filter_queryset(self, queryset):
+		raise Exception("Please implement this method to filter queryset as per user/role.")
+
+	def update(self, request, pk):
+		return Response \
+				( {"detail": "Action not implement."}
+				, status = status.HTTP_501_NOT_IMPLEMENTED
+				)
+
 
 class SaneAPI(SaneAPIMixin, ViewSet):
-    pass
+	pass
