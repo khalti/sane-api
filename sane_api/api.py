@@ -12,7 +12,7 @@ class SaneAPIMixin:
 		return view.action or request.method.lower()
 
 	def _get_authorizer(self, request, view, obj = None):
-		instance = obj || view
+		instance = obj or view
 		action_name = self._get_action_name(view)
 
 		try:
@@ -22,11 +22,11 @@ class SaneAPIMixin:
 
 	def has_permission(self, request, view):
 		authorizer = self._get_authorizer(self, request, view)
-		return authorizer and not not authorizer(request.user, request):
+		return authorizer and not not authorizer(request.user, request)
 
 	def has_object_permission(self, request, view, obj):
 		authorizer = self._get_authorizer(self, request, view, obj)
-		return authorizer and not not authorizer(request.user, request):
+		return authorizer and not not authorizer(request.user, request)
 
 	def get_serializer_class(self):
 		# resolve serializers based upon the versions of api

@@ -1,6 +1,32 @@
-class TestSaneAPIMixin:
+from django.test import TestCase
+
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.test import APIRequestFactory
+from rest_framework.viewsets import ViewSet
+
+from sane_api.api import SaneAPIMixin
+
+factory = APIRequestFactory()
+
+class ASaneAPI(SaneAPIMixin, ViewSet):
+	def create(self, request):
+		return Response({"detail": "Created somethiing."}, status = status.HTTP_201_CREATED)
+
+	def list(self, request):
+		return Response({"detail": "Some detail."})
+
+	def can_list(self, user, request):
+		return False
+
+
+class TestSaneAPIMixin(TestCase):
 	def test1(self):
-		assert 0, "It implements action based api level permission by default."
+		request = factory.get('/', '', content_type='application/json')
+		aview = ASaneAPI.as_view(actions= {'get': 'list', })
+
+		response = aview(request)
+		assert response.status_code == 200, "It implements action based api level permission by default."
 
 	def test2(self):
 		assert 0, "It implements action based object level permission."
