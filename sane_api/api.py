@@ -34,8 +34,8 @@ class SaneAPIMixin:
 		pass
 
 class SaneModelAPI(SaneAPIMixin, ModelViewSet):
-	def filter_queryset(self, queryset):
-		raise Exception("Please implement this method to filter queryset as per user/role.")
+	# def filter_queryset(self, queryset):
+	# 	raise Exception("Please implement this method to filter queryset as per user/role.")
 
 	def update(self, request, pk):
 		return Response \
