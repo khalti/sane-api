@@ -1,8 +1,7 @@
-import inspect
-
 from rest_framework.viewsets import (ModelViewSet, ViewSet, )
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.decorators import list_route
 
 
 class SanePermissionClass:
@@ -29,14 +28,11 @@ class SanePermissionClass:
 class SaneAPIMixin:
 	permission_classes = [SanePermissionClass]
 
-	def get_serializer_class(self):
-		# resolve serializers based upon the versions of api
+	@list_route(methods=["get"])
+	def inspect(self, request):
 		pass
 
 class SaneModelAPI(SaneAPIMixin, ModelViewSet):
-	# def filter_queryset(self, queryset):
-	# 	raise Exception("Please implement this method to filter queryset as per user/role.")
-
 	def update(self, request, pk):
 		return Response \
 				( {"detail": "Action not implement."}
