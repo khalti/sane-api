@@ -9,7 +9,7 @@ from rest_framework.test import APIRequestFactory
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import detail_route, list_route
 
-from sane_api.api import SaneAPIMixin, SaneAPI, SaneModelAPI
+from sane_api.apis import SaneAPIMixin, SaneAPI, SaneModelAPI
 
 factory = APIRequestFactory()
 

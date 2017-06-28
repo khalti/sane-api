@@ -31,7 +31,7 @@ class AnObject:
 
 class TestSaneSerializer(TestCase):
 	def test1(self):
-		fields = ["field1", "field2"]
+		fields = "field1,field2"
 		request = factory.get("/", content_type='application/json')
 		request.query_params = {"fields": fields}
 		s = ASaneSerializer(AnObject, context = {"request": request})
@@ -39,7 +39,7 @@ class TestSaneSerializer(TestCase):
 			"It returns requested readable fields."
 
 	def test2(self):
-		fields = ["field4", "field5"]
+		fields = "field4,field5"
 		request = factory.get("/", content_type='application/json')
 		request.query_params = {"fields": fields}
 		s = ASaneSerializer(AnObject, context = {"request": request})
@@ -47,7 +47,7 @@ class TestSaneSerializer(TestCase):
 			"It returns empty dict if requested fields are not accessible."
 
 	def test3(self):
-		fields = ["field6", "field7"]
+		fields = "field6,field7"
 		request = factory.get("/", content_type='application/json')
 		request.query_params = {"fields": fields}
 		s = ASaneSerializer(AnObject, context = {"request": request})
@@ -74,7 +74,6 @@ class TestSaneSerializer(TestCase):
 			"It returns writable fields for post request."
 
 	def test5(self):
-		fields = ["field6", "field7"]
 		request = factory.post("/", content_type='application/json')
 		data = \
 			{ "field1": 1
@@ -94,7 +93,6 @@ class TestSaneSerializer(TestCase):
 			"It returns writable fields for put request."
 
 	def test6(self):
-		fields = ["field6", "field7"]
 		request = factory.post("/", content_type='application/json')
 		data = \
 			{ "field3": 3
@@ -108,4 +106,16 @@ class TestSaneSerializer(TestCase):
 				, "field4": 4
 				}
 		assert s.data == expected_data, \
-			"It returns sub set of writable fields for patch request."
+			"It returns fields being patched for patch request."
+
+	def test7(self):
+		request = factory.get("/", content_type='application/json')
+		request.query_params = {}
+		s = ASaneSerializer(AnObject, context = {"request": request})
+		expected = \
+				{ "field1": 1
+				, "field2": 2
+				, "field3": 3
+				}
+		assert s.data == expected, \
+			"It returns all the fields if 'fields' are not specified."
