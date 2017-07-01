@@ -119,3 +119,42 @@ class TestSaneSerializer(TestCase):
 				}
 		assert s.data == expected, \
 			"It returns all the fields if 'fields' are not specified."
+
+	def test8(self):
+		class AModel(models.Model):
+			field1 = models.IntegerField()
+
+			class Meta:
+				app_label="tests"
+
+			def can_retrieve(self, user, request):
+				return True
+
+			def can_update(self, user, request):
+				return False
+
+			def can_destroy(self, user, request):
+				return True
+
+		class BSaneSerializer(SaneModelSerializer):
+			field1 = serializers.IntegerField()
+
+			def get_readable_fields(self):
+				return ['field1', 'permissions']
+
+			class Meta:
+				model = AModel
+				fields = "__all__"
+				app_label = "bruno"
+
+		request = factory.get("/", content_type='application/json')
+		request.query_params = {}
+		request.user = {}
+
+		amodel = AModel(field1=1)
+		s = BSaneSerializer(amodel, context = {"request": request})
+		expected = \
+				{ "field1": 1
+				, "permissions": ["destroy", "retrieve"]
+				}
+		assert s.data == expected, "It includes 'permissions' field."

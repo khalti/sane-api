@@ -1,4 +1,26 @@
-from rest_framework.serializers import Serializer, ModelSerializer
+import re
+from functools import partial
+
+from rest_framework.serializers import Serializer, ModelSerializer, Field
+
+class PermissionField(Field):
+	def __init__(self, *args, **kwargs):
+		kwargs["read_only"] = True
+		super(PermissionField, self).__init__(*args, **kwargs)
+
+	def to_representation(self, obj):
+		request = self.context["request"]
+		permission_methods = filter(lambda method: re.match("can_", method), dir(obj))
+		permissions = []
+		for permission_method in permission_methods:
+			permission_name = permission_method.replace("can_", "")
+			authorizer = getattr(obj, permission_method)
+			if authorizer(request.user, request):
+				permissions.append(permission_name)
+		return permissions
+
+	def get_attribute(self, instance):
+		return instance
 
 class SaneSerializerMixin:
 	def __init__(self, *args, **kwargs):
@@ -27,8 +49,9 @@ class SaneSerializerMixin:
 		for field in available_fields - final_fields:
 			self.fields.pop(field)
 
+
 class SaneSerializer(SaneSerializerMixin, Serializer):
 	pass
 
 class SaneModelSerializer(SaneSerializerMixin, ModelSerializer):
-	pass
+	permissions = PermissionField()
