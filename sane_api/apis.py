@@ -33,11 +33,7 @@ class SaneAPIMixin:
 		pass
 
 class SaneModelAPI(SaneAPIMixin, ModelViewSet):
-	def update(self, request, pk):
-		return Response \
-				( {"detail": "Action not implement."}
-				, status = status.HTTP_501_NOT_IMPLEMENTED
-				)
+	pass
 
 
 class SaneAPI(SaneAPIMixin, ViewSet):

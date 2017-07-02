@@ -23,4 +23,8 @@ setup_tmux () {
 	connect $project
 }
 
+test () {
+	py.test tests/*
+}
+
 $@
