@@ -33,7 +33,8 @@ class SaneAPIMixin:
 		pass
 
 class SaneModelAPI(SaneAPIMixin, ModelViewSet):
-	pass
+	def get_queryset(self):
+		raise Exception("Please implement .get_queryset() and tailor it for specific user/group.")
 
 
 class SaneAPI(SaneAPIMixin, ViewSet):

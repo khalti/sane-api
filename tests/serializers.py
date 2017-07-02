@@ -158,3 +158,15 @@ class TestSaneSerializer(TestCase):
 				, "permissions": ["destroy", "retrieve"]
 				}
 		assert s.data == expected, "It includes 'permissions' field."
+
+	def test9(self):
+		assert 0, "It handles nested fields request."
+		# request.query_params["fields"] = \
+		# 		[ "name"
+		# 		, "username"
+		# 		, {"profile": ["pic", "nationality", "address"]}
+		# 		]
+
+class TestSaneSerializerTester:
+	def test1(self):
+		assert 0, "It warns about serializers which do not implement SaneSeriaizer"
