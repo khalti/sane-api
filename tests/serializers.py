@@ -121,7 +121,7 @@ class TestSaneSerializer(TestCase):
 			"It returns all the fields if 'fields' are not specified."
 
 	def test8(self):
-		class AModel(models.Model):
+		class BModel(models.Model):
 			field1 = models.IntegerField()
 
 			class Meta:
@@ -143,7 +143,7 @@ class TestSaneSerializer(TestCase):
 				return ['field1', 'permissions']
 
 			class Meta:
-				model = AModel
+				model = BModel
 				fields = "__all__"
 				app_label = "bruno"
 
@@ -151,7 +151,7 @@ class TestSaneSerializer(TestCase):
 		request.query_params = {}
 		request.user = {}
 
-		amodel = AModel(field1=1)
+		amodel = BModel(field1=1)
 		s = BSaneSerializer(amodel, context = {"request": request})
 		expected = \
 				{ "field1": 1
