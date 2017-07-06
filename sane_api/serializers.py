@@ -36,9 +36,7 @@ class SaneSerializerMixin:
 		accessible_fields, requested_fields = None, None
 		if request_method == "get":
 			accessible_fields = set(self.get_readable_fields())
-			fields_str = request.query_params.get("fields")
-			if fields_str:
-				requested_fields = set(fields_str.split(","))
+			requested_fields = self._get_requested_fields(self.context)
 		else:
 			accessible_fields = set(self.get_writable_fields())
 
@@ -49,6 +47,26 @@ class SaneSerializerMixin:
 		for field in available_fields - final_fields:
 			self.fields.pop(field)
 
+	def _get_requested_fields(self, context):
+		request = context["request"]
+		fields = context.get("fields") or request.query_params.get("fields") or []
+		
+		if type(fields) is str:
+			return set(fields.split(","))
+
+		requested_fields = []
+		for field in fields:
+			if type(field) is dict:
+				field_name = list(field)[0]
+				nested_field = self.fields[field_name]
+				if isinstance(nested_field, Serializer):
+					context = self.context
+					context["fields"] = field[field_name]
+					self.fields[field_name] = type(nested_field)(context = self.context)
+				requested_fields.append(field_name)
+			else:
+				requested_fields.append(field)
+		return requested_fields
 
 class SaneSerializer(SaneSerializerMixin, Serializer):
 	pass
