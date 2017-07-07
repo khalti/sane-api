@@ -202,6 +202,53 @@ class TestSaneSerializer(TestCase):
 				}
 		assert s.data == expected, "It handles nested fields request."
 
+	def test10(self):
+		class ChildSerializer(SaneSerializer):
+			field1 = serializers.IntegerField()
+			field2 = serializers.IntegerField()
+			field3 = serializers.IntegerField()
+
+			def get_readable_fields(self):
+				return ("field1", "field2", "field3",)
+
+		class ParentSerializer(SaneSerializer):
+			field1 = serializers.IntegerField()
+			field2 = ChildSerializer(many=True)
+
+			def get_readable_fields(self):
+				return ("field1", "field2")
+
+		class ChildObject:
+			field1 = 1
+			field2 = 2
+			field3 = 3
+
+		class ParentObject:
+			field1 = 1
+			field2 = [ChildObject(), ChildObject()]
+
+		fields = \
+				[ "field1"
+				, {"field2": ["field1", "field3"]
+					}
+				]
+		request = factory.get("/", content_type='application/json')
+		request.query_params = {"fields": fields}
+		s = ParentSerializer(ParentObject, context={'request': request})
+		expected = \
+				{ "field1": 1
+				, "field2": \
+						[
+							{ "field1": 1
+							, "field3": 3
+							},
+							{ "field1": 1
+							, "field3": 3
+							}
+						]
+				}
+		assert s.data == expected, "It handles nested fields request."
+
 class TestSaneSerializerTester:
 	def test1(self):
 		assert 0, "It warns about serializers which do not implement SaneSeriaizer"

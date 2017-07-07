@@ -1,7 +1,13 @@
 import re
 from functools import partial
 
-from rest_framework.serializers import Serializer, ModelSerializer, Field
+from rest_framework.serializers import \
+		( BaseSerializer
+		, Serializer
+		, ModelSerializer
+		, ListSerializer
+		, Field
+		)
 
 class PermissionField(Field):
 	def __init__(self, *args, **kwargs):
@@ -59,10 +65,17 @@ class SaneSerializerMixin:
 			if type(field) is dict:
 				field_name = list(field)[0]
 				nested_field = self.fields[field_name]
-				if isinstance(nested_field, Serializer):
-					context = self.context
-					context["fields"] = field[field_name]
-					self.fields[field_name] = type(nested_field)(context = self.context)
+				if isinstance(nested_field, BaseSerializer):
+					args = nested_field._args
+					kwargs = nested_field._kwargs
+					self.context["fields"] = field[field_name]
+					kwargs["context"] = self.context
+					if isinstance(nested_field, ListSerializer):
+						original_serializer = kwargs.pop("child")
+						kwargs["many"] = True
+						self.fields[field_name] = type(original_serializer)(*args, **kwargs)
+					else:
+						self.fields[field_name] = type(nested_field)(*args, **kwargs)
 				requested_fields.append(field_name)
 			else:
 				requested_fields.append(field)
