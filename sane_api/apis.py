@@ -4,6 +4,8 @@ from rest_framework import status
 from rest_framework.decorators import list_route
 from rest_framework.test import APIClient
 
+from sane_api.serializers import CompositeRequestSerializer
+
 
 class SanePermissionClass:
 	def _get_action_name(self, view, request):
@@ -36,6 +38,7 @@ class SaneModelAPI(SaneAPIMixin, ModelViewSet):
 class SaneAPI(SaneAPIMixin, ViewSet):
 	pass
 
+
 class HelperAPI(SaneAPI):
 	@list_route(methods=["post"])
 	def compose(self, request):
@@ -43,8 +46,19 @@ class HelperAPI(SaneAPI):
 		if request.user and request.user.is_authenticated():
 			client.force_authenticate(request.user)
 
-		print(request.data)
-		return Response({"detail": "Yo"}, status=200)
+		response = {}
+		for key, value in request.data.items():
+			s = CompositeRequestSerializer(data = value)
+			if not s.is_valid():
+				response[key] = s.errors
+				continue
+			response[key] = client.get \
+					( s.validated_data["url"]
+					, s.validated_data.get("query", {})
+					, format="json"
+					).json()
+
+		return Response(response, status=200)
 
 	def can_compose(self, user, request):
 		return True

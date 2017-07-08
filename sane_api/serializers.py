@@ -7,6 +7,8 @@ from rest_framework.serializers import \
 		, ModelSerializer
 		, ListSerializer
 		, Field
+		, CharField
+		, JSONField
 		)
 
 class PermissionField(Field):
@@ -86,3 +88,7 @@ class SaneSerializer(SaneSerializerMixin, Serializer):
 
 class SaneModelSerializer(SaneSerializerMixin, ModelSerializer):
 	permissions = PermissionField()
+
+class CompositeRequestSerializer(Serializer):
+	url = CharField()
+	query = JSONField(required=False)

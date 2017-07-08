@@ -153,39 +153,70 @@ class TestHelperAPI(APITestCase):
 		from tests.urls import urlpatterns
 		from rest_framework import routers
 
-		class ASaneAPI(SaneAPI):
-			def list(self, request):
-				return Response({}, status=200)
+		class LocationAPI(SaneAPI):
+			@list_route(methods=["get"])
+			def location1(self, request):
+				data = { "id": 1 , "name": "location 1" }
+				return Response(data, status=200)
 
-			def can_list(self, user, request):
+			def can_location1(self, user, request):
 				return True
 
-			def retrieve(self, request):
-				return Response({}, status=200)
+			@list_route(methods=["get"])
+			def location2(self, request):
+				data = \
+						[
+								{ "id": 2, "name": "location 2", "parent": 1},
+								{ "id": 3, "name": "location 2", "parent": 2},
+								{ "id": 4, "name": "location 2", "parent": 1},
+						]
+				parent = request.query_params.get("parent")
+				if parent:
+					filtered_data = filter(lambda adata: parent == adata["id"], data)
+				else:
+					filtered_data = []
+				return Response(filtered_data, status=200)
 
-			def can_retrieve(self, user, request):
+			def can_location2(self, user, request):
+				return True
+
+			@list_route(methods=["get"])
+			def location3(self, request):
+				return Response(request.query_params.get("id", []), status=200)
+
+			def can_location3(self, user, request):
 				return True
 
 		router = routers.SimpleRouter()
-		router.register("api", ASaneAPI, base_name="api")
+		router.register("location", LocationAPI, base_name="location")
 		router.register("helper", HelperAPI, base_name="helper")
 
 		urlpatterns.extend(router.urls)
 
 	def test_compose1(self):
 		from django.core.urlresolvers import reverse
-
 		self.setup_compose()
+
 		payload = \
-				{ "user": {"url": "/api/"}
-				, "location": {"url": "/api/"}
+				{ "location1": {"url": "/location/location1/"}
+				, "location2": {"url": "/location/location2/"}
+				, "location3": {"url": "/location/location3/"}
 				}
 		url = reverse("helper-compose")
 		response = self.client.post(url, payload, format="json")	
-		assert 0, "Implement this."
-		# request: post
-		# schema: \
-		# 		{ "user": {url: "/api/user/", params: {}}
-		# 		, "profile": {url: "/api/profile/", params: {user: "{user.id}"}}
-		# 		, "x": {url: "/api/x/{user.id}/", method:<string>, data:{}, params: {}}
-		# 		}
+
+		expected = \
+				{ "location1":{"id":1,"name":"location 1"}
+				, "location2":[]
+				, "location3":[]
+				}
+		assert response.json() == expected, "It works for urls without dependency."
+
+	def test_compose2(self):
+		assert 0, "It works for urls with dependency."
+
+	def test_compose3(self):
+		assert 0, "It complains if urls have cyclic dependency."
+
+	def test_compose4(self):
+		assert 0, "It complains if urls have unrelated dependecy."
