@@ -5,11 +5,11 @@ from django.db import models
 
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.test import APIRequestFactory
+from rest_framework.test import APIRequestFactory, APITestCase
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import detail_route, list_route
 
-from sane_api.apis import SaneAPIMixin, SaneAPI, SaneModelAPI
+from sane_api.apis import SaneAPIMixin, SaneAPI, SaneModelAPI, HelperAPI
 
 factory = APIRequestFactory()
 
@@ -148,8 +148,40 @@ class TestSaneAPITester:
 	def test1(self):
 		assert 0, "It warns about apis which do not implement Sane api."
 
-class TestCompositeAPI:
-	def test1(self):
+class TestHelperAPI(APITestCase):
+	def setup_compose(self):
+		from tests.urls import urlpatterns
+		from rest_framework import routers
+
+		class ASaneAPI(SaneAPI):
+			def list(self, request):
+				return Response({}, status=200)
+
+			def can_list(self, user, request):
+				return True
+
+			def retrieve(self, request):
+				return Response({}, status=200)
+
+			def can_retrieve(self, user, request):
+				return True
+
+		router = routers.SimpleRouter()
+		router.register("api", ASaneAPI, base_name="api")
+		router.register("helper", HelperAPI, base_name="helper")
+
+		urlpatterns.extend(router.urls)
+
+	def test_compose1(self):
+		from django.core.urlresolvers import reverse
+
+		self.setup_compose()
+		payload = \
+				{ "user": {"url": "/api/"}
+				, "location": {"url": "/api/"}
+				}
+		url = reverse("helper-compose")
+		response = self.client.post(url, payload, format="json")	
 		assert 0, "Implement this."
 		# request: post
 		# schema: \
@@ -157,4 +189,3 @@ class TestCompositeAPI:
 		# 		, "profile": {url: "/api/profile/", params: {user: "{user.id}"}}
 		# 		, "x": {url: "/api/x/{user.id}/", method:<string>, data:{}, params: {}}
 		# 		}
-

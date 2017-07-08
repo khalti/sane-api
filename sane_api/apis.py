@@ -2,6 +2,7 @@ from rest_framework.viewsets import (ModelViewSet, ViewSet, )
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import list_route
+from rest_framework.test import APIClient
 
 
 class SanePermissionClass:
@@ -28,14 +29,26 @@ class SanePermissionClass:
 class SaneAPIMixin:
 	permission_classes = [SanePermissionClass]
 
-	@list_route(methods=["get"])
-	def inspect(self, request):
-		pass
-
 class SaneModelAPI(SaneAPIMixin, ModelViewSet):
 	def get_queryset(self):
 		raise Exception("Please implement .get_queryset() and tailor it for specific user/group.")
 
-
 class SaneAPI(SaneAPIMixin, ViewSet):
 	pass
+
+class HelperAPI(SaneAPI):
+	@list_route(methods=["post"])
+	def compose(self, request):
+		client = APIClient()
+		if request.user and request.user.is_authenticated():
+			client.force_authenticate(request.user)
+
+		print(request.data)
+		return Response({"detail": "Yo"}, status=200)
+
+	def can_compose(self, user, request):
+		return True
+
+	@list_route(methods=["get"])
+	def doc(self, request):
+		pass
