@@ -172,7 +172,7 @@ class TestHelperAPI(APITestCase):
 						]
 				parent = request.query_params.get("parent")
 				if parent:
-					filtered_data = filter(lambda adata: parent == adata["id"], data)
+					filtered_data = filter(lambda adata: parent == str(adata["parent"]), data)
 				else:
 					filtered_data = []
 				return Response(filtered_data, status=200)
@@ -182,6 +182,7 @@ class TestHelperAPI(APITestCase):
 
 			@list_route(methods=["get"])
 			def location3(self, request):
+				print(request.query_params.get("id"))
 				return Response(request.query_params.get("id", []), status=200)
 
 			def can_location3(self, user, request):
@@ -213,7 +214,33 @@ class TestHelperAPI(APITestCase):
 		assert response.json() == expected, "It works for urls without dependency."
 
 	def test_compose2(self):
-		assert 0, "It works for urls with dependency."
+		from django.core.urlresolvers import reverse
+		self.setup_compose()
+
+		payload = \
+				{ "location1": {"url": "/location/location1/"}
+				, "location2": \
+						{"url": "/location/location2/"
+						, "query": {"parent": "{location1.id}"}
+						}
+				, "location3": \
+						{ "url": "/location/location3/"
+						, "query": {"id": "{location2.id}"}
+						}
+				}
+		url = reverse("helper-compose")
+		response = self.client.post(url, payload, format="json")	
+
+		expected = \
+				{ "location1":{"id":1,"name":"location 1"}
+				, "location2":[
+						{ "id": 2, "name": "location 2", "parent": 1},
+						{ "id": 4, "name": "location 2", "parent": 1},
+					]
+				, "location3": "2,4"
+				}
+		print(response.json())
+		assert response.json() == expected, "It works for urls with dependency."
 
 	def test_compose3(self):
 		assert 0, "It complains if urls have cyclic dependency."

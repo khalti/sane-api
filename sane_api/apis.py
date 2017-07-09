@@ -1,3 +1,9 @@
+import copy
+import re
+from functools import reduce
+import ast
+import json
+
 from rest_framework.viewsets import (ModelViewSet, ViewSet, )
 from rest_framework.response import Response
 from rest_framework import status
@@ -40,25 +46,64 @@ class SaneAPI(SaneAPIMixin, ViewSet):
 
 
 class HelperAPI(SaneAPI):
-	@list_route(methods=["post"])
-	def compose(self, request):
-		client = APIClient()
-		if request.user and request.user.is_authenticated():
-			client.force_authenticate(request.user)
+	def get_value_at(self, path, source):
+		if type(source) is list:
+			dlist = map(lambda x: self.get_value_at(copy.deepcopy(path), x), source)
+			return reduce(lambda x, y: "{},{}".format(x,y), dlist)
 
-		response = {}
-		for key, value in request.data.items():
-			s = CompositeRequestSerializer(data = value)
+		if len(path) == 0:
+			return source
+		this_path = path.pop(0)
+		return self.get_value_at(path, source[this_path])
+
+	def fill_template(self, req_sig, responses):
+		req_sig_str = json.dumps(req_sig)
+		match = re.search(r"{([a-zA-Z0-9\.]+)}", req_sig_str)
+		if match:
+			for group in match.groups():
+				path = group.split(".")
+				pattern = "{" + group + "}"
+				try:
+					value = self.get_value_at(copy.deepcopy(path), responses)
+					req_sig = json.loads(req_sig_str.replace(pattern, str(value)))
+				except KeyError:
+					return None
+
+		return req_sig
+
+	def get_sub_requests(self, requests, responses={}):
+		if len(requests) == 0:
+			return responses
+
+		key, req_sig = requests.pop(0)
+		processed_sig = self.fill_template(req_sig, responses)
+		if not processed_sig:
+			requests.append([key, req_sig])
+		else:
+			s = CompositeRequestSerializer(data = processed_sig)
 			if not s.is_valid():
-				response[key] = s.errors
-				continue
-			response[key] = client.get \
+				responses[key] = s.errors
+
+			responses[key] = self.client.get \
 					( s.validated_data["url"]
 					, s.validated_data.get("query", {})
 					, format="json"
 					).json()
 
-		return Response(response, status=200)
+		return self.get_sub_requests(requests, responses)
+
+	@list_route(methods=["post"])
+	def compose(self, request):
+		self.client = APIClient()
+		if request.user and request.user.is_authenticated():
+			client.force_authenticate(request.user)
+
+		requests = []
+		for key, value in request.data.items():
+			requests.append([key, value])
+
+		responses = self.get_sub_requests(requests)
+		return Response(responses, status=200)
 
 	def can_compose(self, user, request):
 		return True
