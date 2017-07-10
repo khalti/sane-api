@@ -185,11 +185,7 @@ class TestSaneSerializer(TestCase):
 			field2 = ChildObject
 
 
-		fields = \
-				[ "field1"
-				, {"field2": ["field1", "field3"]
-					}
-				]
+		fields = "field1,field2{field1,field3}"
 		request = factory.get("/", content_type='application/json')
 		request.query_params = {"fields": fields}
 		s = ParentSerializer(ParentObject, context={'request': request})
@@ -227,11 +223,7 @@ class TestSaneSerializer(TestCase):
 			field1 = 1
 			field2 = [ChildObject(), ChildObject()]
 
-		fields = \
-				[ "field1"
-				, {"field2": ["field1", "field3"]
-					}
-				]
+		fields = "field1,field2{field1,field3}"
 		request = factory.get("/", content_type='application/json')
 		request.query_params = {"fields": fields}
 		s = ParentSerializer(ParentObject, context={'request': request})
@@ -247,7 +239,8 @@ class TestSaneSerializer(TestCase):
 							}
 						]
 				}
-		assert s.data == expected, "It handles nested fields request."
+		assert s.data == expected,\
+				"It handles nested fields request for many to many relation."
 
 class TestSaneSerializerTester:
 	def test1(self):

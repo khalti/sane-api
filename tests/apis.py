@@ -239,7 +239,6 @@ class TestHelperAPI(APITestCase):
 					]
 				, "location3": "2,4"
 				}
-		print(response.json())
 		assert response.json() == expected, "It works for urls with dependency."
 
 	def test_compose3(self):

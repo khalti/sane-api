@@ -1,5 +1,6 @@
 import re
 from functools import partial
+import json
 
 from rest_framework.serializers import \
 		( BaseSerializer
@@ -44,7 +45,7 @@ class SaneSerializerMixin:
 		accessible_fields, requested_fields = None, None
 		if request_method == "get":
 			accessible_fields = set(self.get_readable_fields())
-			requested_fields = self._get_requested_fields(self.context)
+			requested_fields = self.get_requested_fields(self.context)
 		else:
 			accessible_fields = set(self.get_writable_fields())
 
@@ -55,12 +56,20 @@ class SaneSerializerMixin:
 		for field in available_fields - final_fields:
 			self.fields.pop(field)
 
-	def _get_requested_fields(self, context):
+	def normalize_fields_str(self, fields_str):
+		fields_str = "[{}]".format(fields_str)
+		fields_str = re.sub(r"{", ":[", fields_str)
+		fields_str = re.sub(r"}", "]}", fields_str)
+		fields_str = re.sub(r"([a-zA-Z0-9_]+?:\[)", "{\\1", fields_str)
+		fields_str = re.sub(r"([a-zA-Z0-9_]+)", "\"\\1\"", fields_str)
+		return json.loads(fields_str)
+
+	def get_requested_fields(self, context):
 		request = context["request"]
 		fields = context.get("fields") or request.query_params.get("fields") or []
 		
 		if type(fields) is str:
-			return set(fields.split(","))
+			fields = self.normalize_fields_str(fields)
 
 		requested_fields = []
 		for field in fields:
