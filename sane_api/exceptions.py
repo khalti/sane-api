@@ -6,4 +6,4 @@ class UnmetDependency(SaneException):
 
 class CyclicDependency(SaneException):
 	def __init__(self, key):
-		self.message = "The request payload has cyclic dependency at '{}'".format(key)
+		self.message = "The request payload has cyclic dependency at '{}'.".format(key)

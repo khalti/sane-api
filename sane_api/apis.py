@@ -67,21 +67,25 @@ class HelperAPI(SaneAPI):
 				try:
 					value = self.get_value_at(copy.deepcopy(path), responses)
 					req_sig = json.loads(req_sig_str.replace(pattern, str(value)))
-				except (KeyError, TypeError):
+				except KeyError:
 					return None
 
 		return req_sig
 
-	def get_sub_requests(self, requests, responses={}, pending=[]):
+	def check_cyclic_dependency(self, key, pendings):
+		occurance = filter(lambda pending: pending == key, pendings)
+		if len(list(occurance)) == 2:
+			raise CyclicDependency(key)
+
+	def get_sub_requests(self, requests, responses={}, pendings=[]):
 		if len(requests) == 0:
 			return responses
 
 		key, req_sig = requests.pop(0)
-		processed_sig = self.fill_template(req_sig, responses=[])
+		processed_sig = self.fill_template(req_sig, responses)
 		if not processed_sig:
-			if key in pending:
-				raise CyclicDependency(key)
-			pending.append(key)
+			self.check_cyclic_dependency(key, pendings)
+			pendings.append(key)
 			requests.append([key, req_sig])
 		else:
 			s = CompositeRequestSerializer(data = processed_sig)
@@ -94,7 +98,7 @@ class HelperAPI(SaneAPI):
 					, format="json"
 					).json()
 
-		return self.get_sub_requests(requests, responses, pending)
+		return self.get_sub_requests(requests, responses, pendings)
 
 	@list_route(methods=["post"])
 	def compose(self, request):
