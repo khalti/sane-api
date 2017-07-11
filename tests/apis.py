@@ -260,7 +260,7 @@ class TestHelperAPI(APITestCase):
 		response = self.client.post(url, payload, format="json")	
 
 		assert response.status_code == 400, "It complains if urls have cyclic dependency."
-		assert "location2" in response.json()["detail"]
+		assert "location2" or "location3" in response.json()["detail"]
 
 	def test_compose4(self):
 		from django.core.urlresolvers import reverse
@@ -296,4 +296,4 @@ class TestHelperAPI(APITestCase):
 
 		assert response.status_code == 400, \
 				"It complains if a url has unmet dependecy at sub level."
-		assert "location2" in response.json()["detail"]
+		assert "location1.nokey" in response.json()["detail"]

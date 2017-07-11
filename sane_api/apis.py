@@ -11,7 +11,7 @@ from rest_framework.decorators import list_route
 from rest_framework.test import APIClient
 
 from sane_api.serializers import CompositeRequestSerializer
-from sane_api.exceptions import SaneException, CyclicDependency
+from sane_api.exceptions import SaneException, CyclicDependency, UnmetDependency
 
 
 class SanePermissionClass:
@@ -47,15 +47,28 @@ class SaneAPI(SaneAPIMixin, ViewSet):
 
 
 class HelperAPI(SaneAPI):
-	def get_value_at(self, path, source):
+	def get_value_at(self, to_walk, source, start=False, walked=[]):
 		if type(source) is list:
-			dlist = map(lambda x: self.get_value_at(copy.deepcopy(path), x), source)
+			dlist = map\
+					(lambda x: self.get_value_at\
+						(copy.deepcopy(to_walk), x), source)
 			return reduce(lambda x, y: "{},{}".format(x,y), dlist)
 
-		if len(path) == 0:
+		if len(to_walk) == 0:
 			return source
-		this_path = path.pop(0)
-		return self.get_value_at(path, source[this_path])
+
+		this_path = to_walk.pop(0)
+		walked.append(this_path)
+		if start and not self.request.data.get(this_path):
+			raise UnmetDependency(walked)
+
+		try:
+			return self.get_value_at\
+					(to_walk, source[this_path], walked=walked)
+		except KeyError as e:
+			if not start:
+				raise UnmetDependency(walked)
+			raise e
 
 	def fill_template(self, req_sig, responses):
 		req_sig_str = json.dumps(req_sig)
@@ -65,7 +78,7 @@ class HelperAPI(SaneAPI):
 				path = group.split(".")
 				pattern = "{" + group + "}"
 				try:
-					value = self.get_value_at(copy.deepcopy(path), responses)
+					value = self.get_value_at(copy.deepcopy(path), responses, start=True)
 					req_sig = json.loads(req_sig_str.replace(pattern, str(value)))
 				except KeyError:
 					return None
