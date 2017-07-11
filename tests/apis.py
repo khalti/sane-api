@@ -149,7 +149,7 @@ class TestSaneAPITester:
 		assert 0, "It warns about apis which do not implement Sane api."
 
 class TestHelperAPI(APITestCase):
-	def setup_compose(self):
+	def setUp(self):
 		from tests.urls import urlpatterns
 		from rest_framework import routers
 
@@ -182,7 +182,6 @@ class TestHelperAPI(APITestCase):
 
 			@list_route(methods=["get"])
 			def location3(self, request):
-				print(request.query_params.get("id"))
 				return Response(request.query_params.get("id", []), status=200)
 
 			def can_location3(self, user, request):
@@ -194,9 +193,12 @@ class TestHelperAPI(APITestCase):
 
 		urlpatterns.extend(router.urls)
 
+	def tearDown(self):
+		from tests.urls import urlpatterns
+		del urlpatterns[:]
+
 	def test_compose1(self):
 		from django.core.urlresolvers import reverse
-		self.setup_compose()
 
 		payload = \
 				{ "location1": {"url": "/location/location1/"}
@@ -213,9 +215,9 @@ class TestHelperAPI(APITestCase):
 				}
 		assert response.json() == expected, "It works for urls without dependency."
 
+
 	def test_compose2(self):
 		from django.core.urlresolvers import reverse
-		self.setup_compose()
 
 		payload = \
 				{ "location1": {"url": "/location/location1/"}
@@ -241,9 +243,9 @@ class TestHelperAPI(APITestCase):
 				}
 		assert response.json() == expected, "It works for urls with dependency."
 
+
 	def test_compose3(self):
 		from django.core.urlresolvers import reverse
-		self.setup_compose()
 
 		payload = \
 				{ "location1": {"url": "/location/location1/"}
@@ -262,9 +264,9 @@ class TestHelperAPI(APITestCase):
 		assert response.status_code == 400, "It complains if urls have cyclic dependency."
 		assert "location2" or "location3" in response.json()["detail"]
 
+
 	def test_compose4(self):
 		from django.core.urlresolvers import reverse
-		self.setup_compose()
 
 		payload = \
 				{ "location1": {"url": "/location/location1/"}
@@ -280,9 +282,9 @@ class TestHelperAPI(APITestCase):
 				"It complains if a url has unmet dependecy at root level."
 		assert "location3" in response.json()["detail"]
 
+
 	def test_compose5(self):
 		from django.core.urlresolvers import reverse
-		self.setup_compose()
 
 		payload = \
 				{ "location1": {"url": "/location/location1/"}
@@ -297,3 +299,4 @@ class TestHelperAPI(APITestCase):
 		assert response.status_code == 400, \
 				"It complains if a url has unmet dependecy at sub level."
 		assert "location1.nokey" in response.json()["detail"]
+

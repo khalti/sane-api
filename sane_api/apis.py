@@ -85,19 +85,13 @@ class HelperAPI(SaneAPI):
 
 		return req_sig
 
-	def check_cyclic_dependency(self, key, pendings):
-		occurance = filter(lambda pending: pending == key, pendings)
-		if len(list(occurance)) == 2:
-			raise CyclicDependency(key)
-
-	def get_sub_requests(self, requests, responses={}, pendings=[]):
+	def get_sub_requests(self, requests, responses, pendings):
 		if len(requests) == 0:
 			return responses
 
 		key, req_sig = requests.pop(0)
 		processed_sig = self.fill_template(req_sig, responses)
 		if not processed_sig:
-			self.check_cyclic_dependency(key, pendings)
 			pendings.append(key)
 			requests.append([key, req_sig])
 		else:
@@ -113,8 +107,33 @@ class HelperAPI(SaneAPI):
 
 		return self.get_sub_requests(requests, responses, pendings)
 
+	def walk(self, key, requests, dependents):
+		occurances = filter(lambda dependent: dependent == key, dependents)
+		if len(list(occurances)) > 2:
+			raise CyclicDependency(key)
+
+		try:
+			match = re.search(r"{([a-zA-Z0-9_.]+?)}", json.dumps(requests[key]))
+		except KeyError:
+			raise UnmetDependency([key])
+
+		if not match:
+			return
+		dependents.append(key)
+		for group in match.groups():
+			self.walk(group.split(".")[0], requests, dependents)
+
+	def check_cyclic_dependency(self, requests):
+		for key, value in requests.items():
+			self.walk(key, requests, dependents=[])
+
 	@list_route(methods=["post"])
 	def compose(self, request):
+		try:
+			self.check_cyclic_dependency(request.data)
+		except SaneException as e:
+			return Response({"detail": e.message}, status=400)
+
 		self.client = APIClient()
 		if request.user and request.user.is_authenticated():
 			client.force_authenticate(request.user)
@@ -124,7 +143,7 @@ class HelperAPI(SaneAPI):
 			requests.append([key, value])
 
 		try:
-			responses = self.get_sub_requests(requests)
+			responses = self.get_sub_requests(requests, responses={}, pendings=[])
 		except SaneException as e:
 			return Response({"detail": e.message}, status=400)
 		return Response(responses, status=200)
