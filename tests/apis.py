@@ -220,7 +220,7 @@ class TestHelperAPI(APITestCase):
 		payload = \
 				{ "location1": {"url": "/location/location1/"}
 				, "location2": \
-						{"url": "/location/location2/"
+						{ "url": "/location/location2/"
 						, "query": {"parent": "{location1.id}"}
 						}
 				, "location3": \
@@ -242,7 +242,58 @@ class TestHelperAPI(APITestCase):
 		assert response.json() == expected, "It works for urls with dependency."
 
 	def test_compose3(self):
-		assert 0, "It complains if urls have cyclic dependency."
+		from django.core.urlresolvers import reverse
+		self.setup_compose()
+
+		payload = \
+				{ "location1": {"url": "/location/location1/"}
+				, "location2": \
+						{ "url": "/location/location2/"
+						, "query": {"parent": "{location3.id}"}
+						}
+				, "location3": \
+						{ "url": "/location/location3/"
+						, "query": {"id": "{location2.id}"}
+						}
+				}
+		url = reverse("helper-compose")
+		response = self.client.post(url, payload, format="json")	
+
+		assert response.status_code == 400, "It complains if urls have cyclic dependency."
+		assert "location2" in response.json()["detail"]
 
 	def test_compose4(self):
-		assert 0, "It complains if urls have unrelated dependecy."
+		from django.core.urlresolvers import reverse
+		self.setup_compose()
+
+		payload = \
+				{ "location1": {"url": "/location/location1/"}
+				, "location2": \
+						{ "url": "/location/location2/"
+						, "query": {"parent": "{location3.id}"}
+						}
+				}
+		url = reverse("helper-compose")
+		response = self.client.post(url, payload, format="json")	
+
+		assert response.status_code == 400, \
+				"It complains if a url has unmet dependecy at root level."
+		assert "location3" in response.json()["detail"]
+
+	def test_compose5(self):
+		from django.core.urlresolvers import reverse
+		self.setup_compose()
+
+		payload = \
+				{ "location1": {"url": "/location/location1/"}
+				, "location2": \
+						{ "url": "/location/location2/"
+						, "query": {"parent": "{location1.nokey}"}
+						}
+				}
+		url = reverse("helper-compose")
+		response = self.client.post(url, payload, format="json")	
+
+		assert response.status_code == 400, \
+				"It complains if a url has unmet dependecy at sub level."
+		assert "location2" in response.json()["detail"]

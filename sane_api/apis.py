@@ -11,6 +11,7 @@ from rest_framework.decorators import list_route
 from rest_framework.test import APIClient
 
 from sane_api.serializers import CompositeRequestSerializer
+from sane_api.exceptions import SaneException, CyclicDependency
 
 
 class SanePermissionClass:
@@ -66,18 +67,21 @@ class HelperAPI(SaneAPI):
 				try:
 					value = self.get_value_at(copy.deepcopy(path), responses)
 					req_sig = json.loads(req_sig_str.replace(pattern, str(value)))
-				except KeyError:
+				except (KeyError, TypeError):
 					return None
 
 		return req_sig
 
-	def get_sub_requests(self, requests, responses={}):
+	def get_sub_requests(self, requests, responses={}, pending=[]):
 		if len(requests) == 0:
 			return responses
 
 		key, req_sig = requests.pop(0)
-		processed_sig = self.fill_template(req_sig, responses)
+		processed_sig = self.fill_template(req_sig, responses=[])
 		if not processed_sig:
+			if key in pending:
+				raise CyclicDependency(key)
+			pending.append(key)
 			requests.append([key, req_sig])
 		else:
 			s = CompositeRequestSerializer(data = processed_sig)
@@ -90,7 +94,7 @@ class HelperAPI(SaneAPI):
 					, format="json"
 					).json()
 
-		return self.get_sub_requests(requests, responses)
+		return self.get_sub_requests(requests, responses, pending)
 
 	@list_route(methods=["post"])
 	def compose(self, request):
@@ -102,7 +106,10 @@ class HelperAPI(SaneAPI):
 		for key, value in request.data.items():
 			requests.append([key, value])
 
-		responses = self.get_sub_requests(requests)
+		try:
+			responses = self.get_sub_requests(requests)
+		except SaneException as e:
+			return Response({"detail": e.message}, status=400)
 		return Response(responses, status=200)
 
 	def can_compose(self, user, request):
