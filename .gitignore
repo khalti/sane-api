@@ -3,3 +3,4 @@ migrations
 .cache
 __pycache__
 sane_api.egg-info
+db.sqlite3
