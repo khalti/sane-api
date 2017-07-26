@@ -1,3 +1,5 @@
-.env/
+migrations
+.env
+.cache
 __pycache__
-.cache/
+sane_api.egg-info

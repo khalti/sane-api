@@ -15,7 +15,7 @@ kwargs =  {
   "version": "0.1.0",
   "description": "Secure and scalable REST API.",
   "long_description": read_file("readme.md"),
-  "author": "ludbek"
+  "author": "ludbek",
   "author_email": "sth.srn@gmail.com",
   "url": "https://github.com/janakitech/sane-api",
   "license": read_file("license.txt"),

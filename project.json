@@ -1,0 +1,7 @@
+{
+  "dev-dependencies": [],
+  "dependencies": [
+    "django-rest-framework==0.1.0",
+    "django==1.11.3"
+  ]
+}
