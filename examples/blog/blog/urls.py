@@ -17,11 +17,13 @@ from django.conf.urls import url
 from django.contrib import admin
 from rest_framework.routers import SimpleRouter
 from app.apis import ArticleAPI, CommentAPI
+from sane_api.apis import HelperAPI
 
 router = SimpleRouter()
 
 router.register(r"api/article", ArticleAPI)
 router.register(r"api/comment", CommentAPI)
+router.register(r"api/helper", HelperAPI, base_name="helper")
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),

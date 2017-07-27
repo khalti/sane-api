@@ -5,7 +5,11 @@ from django.db import models
 from rest_framework.test import APIRequestFactory
 from rest_framework import serializers
 
-from sane_api.serializers import SaneSerializer, SaneModelSerializer
+from sane_api.serializers import \
+		( SaneSerializer
+		, SaneModelSerializer
+		, SaneSerializerMixin
+		)
 
 factory = APIRequestFactory()
 
@@ -28,6 +32,21 @@ class AnObject:
 	field3 = 3
 	field4 = 4
 	field5 = 5
+
+class TestSaneSerializerMixin(TestCase):
+	def test_normalize_str_fields(self):
+		str_fields = "one,two{one,two},three"
+		s = SaneSerializerMixin()
+		got = s.normalize_fields_str(str_fields)
+		expected = \
+				{ "one": None
+				, "two": {
+						"one": None,
+						"two": None
+					}
+				, "three": None
+				}
+		assert got == expected
 
 class TestSaneSerializer(TestCase):
 	def test1(self):

@@ -35,17 +35,22 @@ class SaneSerializerMixin:
 	def __init__(self, *args, **kwargs):
 		super(SaneSerializerMixin, self).__init__(*args, **kwargs)
 
-		if not self.context or not self.context.get("request"):
+		if not hasattr(self, "context") or not self.context.get("request"):
 			return
 
 		request = self.context.get("request")
 		request_method = request.method.lower()
+
+
 		available_fields = set(self.fields.keys())
 
 		accessible_fields, requested_fields = None, None
 		if request_method == "get":
 			accessible_fields = set(self.get_readable_fields())
-			requested_fields = self.get_requested_fields(self.context)
+			fields_str = self.context.get("fields") or request.query_params.get("fields") or {}
+			self._requested_fields = self.normalize_fields_str(fields_str)
+			requested_fields = self._requested_fields.keys()
+			self.reinitialize_fields()
 		else:
 			accessible_fields = set(self.get_writable_fields())
 
@@ -57,40 +62,35 @@ class SaneSerializerMixin:
 			self.fields.pop(field)
 
 	def normalize_fields_str(self, fields_str):
-		fields_str = "[{}]".format(fields_str)
-		fields_str = re.sub(r"{", ":[", fields_str)
-		fields_str = re.sub(r"}", "]}", fields_str)
-		fields_str = re.sub(r"([a-zA-Z0-9_]+?:\[)", "{\\1", fields_str)
+		if type(fields_str) is dict:
+			return fields_str
+
+		fields_str = re.sub(r"{", ":{", fields_str)
+		fields_str = "{" + fields_str + "}"
+		# fields_str = re.sub(r"}", "]}", fields_str)
+		# fields_str = re.sub(r"([a-zA-Z0-9_]+?:\[)", "{\\1", fields_str)
 		fields_str = re.sub(r"([a-zA-Z0-9_]+)", "\"\\1\"", fields_str)
+		fields_str = re.sub(r'("[a-zA-Z0-9_]+")([,}])', "\\1:null\\2", fields_str)
 		return json.loads(fields_str)
 
-	def get_requested_fields(self, context):
-		request = context["request"]
-		fields = context.get("fields") or request.query_params.get("fields") or []
-		
-		if type(fields) is str:
-			fields = self.normalize_fields_str(fields)
+	def reinitialize_fields(self):
+		for field, value in self.fields.items():
+			if isinstance(value, BaseSerializer):
+				self.reinitialize_nested_serializer(field, value)
 
-		requested_fields = []
-		for field in fields:
-			if type(field) is dict:
-				field_name = list(field)[0]
-				nested_field = self.fields[field_name]
-				if isinstance(nested_field, BaseSerializer):
-					args = nested_field._args
-					kwargs = nested_field._kwargs
-					self.context["fields"] = field[field_name]
-					kwargs["context"] = self.context
-					if isinstance(nested_field, ListSerializer):
-						original_serializer = kwargs.pop("child")
-						kwargs["many"] = True
-						self.fields[field_name] = type(original_serializer)(*args, **kwargs)
-					else:
-						self.fields[field_name] = type(nested_field)(*args, **kwargs)
-				requested_fields.append(field_name)
+
+	def reinitialize_nested_serializer(self, field, value):
+		if isinstance(value, BaseSerializer):
+			args = value._args
+			kwargs = value._kwargs
+			self.context["fields"] = self._requested_fields.get(field, {})
+			kwargs["context"] = self.context
+			if isinstance(value, ListSerializer):
+				original_serializer = kwargs.pop("child")
+				kwargs["many"] = True
+				self.fields[field] = type(original_serializer)(*args, **kwargs)
 			else:
-				requested_fields.append(field)
-		return requested_fields
+				self.fields[field] = type(value)(*args, **kwargs)
 
 class SaneSerializer(SaneSerializerMixin, Serializer):
 	pass
