@@ -57,18 +57,13 @@ class SaneSerializerMixin:
 	def __init__(self, *args, **kwargs):
 		if kwargs.get("max_length"):
 			self._max_length = kwargs.pop("max_length")
-
 		super(SaneSerializerMixin, self).__init__(*args, **kwargs)
-
 		if not hasattr(self, "context") or not self.context.get("request"):
 			return
 
 		request = self.context.get("request")
 		request_method = request.method.lower()
-
-
 		available_fields = set(self.fields.keys())
-
 		accessible_fields, requested_fields = None, None
 		if request_method == "get":
 			accessible_fields = set(self.get_readable_fields())
@@ -81,10 +76,21 @@ class SaneSerializerMixin:
 
 		field_groups = [available_fields, accessible_fields, requested_fields]
 		valid_field_groups = filter(lambda group: not not group, field_groups)
-		final_fields = set.intersection(*valid_field_groups)
+		self.final_fields = set.intersection(*valid_field_groups)
 
-		for field in available_fields - final_fields:
+		for field in available_fields - self.final_fields:
 			self.fields.pop(field)
+
+	def to_representation(self, obj):
+		"""
+		Assign 'None' to inaccessible or unavailable fields.
+		Helps in backwark compatibility.
+		"""
+		data = super(SaneSerializerMixin, self).to_representation(obj)
+		empty_fields = set.difference(set(self._requested_fields.keys()), set(data.keys()))
+		for field in empty_fields:
+			data[field] = None
+		return data
 
 	def normalize_fields_str(self, fields_str):
 		if type(fields_str) is dict:
