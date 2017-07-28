@@ -13,7 +13,6 @@ from rest_framework.serializers import \
 		, JSONField
 		, ListSerializer
 		)
-from sane_api.exceptions import SaneException
 
 class SaneListSerializer(ListSerializer):
 	def __init__(self, *args, **kwargs):
@@ -93,6 +92,14 @@ class SaneSerializerMixin:
 		for field in empty_fields:
 			data[field] = None
 		return data
+
+	def get_readable_fields(self):
+		raise Exception \
+				("Please implement this method and so that it returns different fields for different user/group.")
+
+	def get_writable_fields(self):
+		raise Exception \
+				("Please implement this method and so that it returns different fields for different user/group.")
 
 	def normalize_fields_str(self, fields_str):
 		if type(fields_str) is dict:

@@ -13,6 +13,9 @@ class ArticleAPI(SaneModelAPI):
 	def can_list(self, user, request):
 		return True
 
+	def can_retrieve(self, user, request):
+		return True
+
 
 class CommentAPI(SaneModelAPI):
 	queryset = Comment.objects.all()
@@ -22,4 +25,7 @@ class CommentAPI(SaneModelAPI):
 		return self.queryset
 
 	def can_list(self, user, request):
+		return True
+
+	def can_retrieve(self, user, request):
 		return True
