@@ -99,11 +99,13 @@ class HelperAPI(SaneAPI):
 			if not s.is_valid():
 				responses[key] = s.errors
 
-			responses[key] = self.client.get \
+			response = self.client.get \
 					( s.validated_data["url"]
 					, s.validated_data.get("query", {})
 					, format="json"
-					).json()
+					)
+
+			responses[key] = response.json() if response.status_code == 200 else None
 
 		return self.get_sub_requests(requests, responses, pendings)
 
