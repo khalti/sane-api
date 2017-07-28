@@ -67,16 +67,18 @@ class SaneSerializerMixin:
 		accessible_fields, requested_fields = None, None
 		if request_method == "get":
 			accessible_fields = set(self.get_readable_fields())
-			fields_str = self.context.get("fields") or request.query_params.get("fields") or {}
-			self._requested_fields = self.normalize_fields_str(fields_str)
+			if "fields" in self.context.keys():
+				fields_str = self.context.get("fields")
+			else:
+				fields_str = request.query_params.get("fields")
+			self._requested_fields = self.normalize_fields_str(fields_str or {})
 			requested_fields = self._requested_fields.keys()
 			self.reinitialize_fields()
 		else:
 			accessible_fields = set(self.get_writable_fields())
 
 		field_groups = [available_fields, accessible_fields, requested_fields]
-		valid_field_groups = filter(lambda group: not not group, field_groups)
-		self.final_fields = set.intersection(*valid_field_groups)
+		self.final_fields = set.intersection(*field_groups)
 
 		for field in available_fields - self.final_fields:
 			self.fields.pop(field)
@@ -98,8 +100,6 @@ class SaneSerializerMixin:
 
 		fields_str = re.sub(r"{", ":{", fields_str)
 		fields_str = "{" + fields_str + "}"
-		# fields_str = re.sub(r"}", "]}", fields_str)
-		# fields_str = re.sub(r"([a-zA-Z0-9_]+?:\[)", "{\\1", fields_str)
 		fields_str = re.sub(r"([a-zA-Z0-9_]+)", "\"\\1\"", fields_str)
 		fields_str = re.sub(r'("[a-zA-Z0-9_]+")([,}])', "\\1:null\\2", fields_str)
 		return json.loads(fields_str)
