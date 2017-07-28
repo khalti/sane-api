@@ -2,6 +2,7 @@ import re
 from functools import partial
 import json
 
+from django.db import models
 from rest_framework.serializers import \
 		( BaseSerializer
 		, Serializer
@@ -10,7 +11,28 @@ from rest_framework.serializers import \
 		, Field
 		, CharField
 		, JSONField
+		, ListSerializer
 		)
+from sane_api.exceptions import SaneException
+
+class SaneListSerializer(ListSerializer):
+	def __init__(self, *args, **kwargs):
+		if not kwargs.get("max_length"):
+			raise SaneException("Keyword arg 'max_length' is required for nested serializers with many=True.")
+		self._max_length = kwargs.pop("max_length")
+		super(SaneListSerializer, self).__init__(*args, **kwargs)
+
+	def to_representation(self, data):
+		"""
+		List of object instances -> List of dicts of primitive datatypes.
+		"""
+		# Dealing with nested relationships, data can be a Manager,
+		# so, first get a queryset from the Manager if needed
+		iterable = data.all() if isinstance(data, models.Manager) else data
+
+		return [
+			self.child.to_representation(item) for item in iterable[:self._max_length]
+		]
 
 class PermissionField(Field):
 	def __init__(self, *args, **kwargs):
@@ -33,6 +55,9 @@ class PermissionField(Field):
 
 class SaneSerializerMixin:
 	def __init__(self, *args, **kwargs):
+		if kwargs.get("max_length"):
+			self._max_length = kwargs.pop("max_length")
+
 		super(SaneSerializerMixin, self).__init__(*args, **kwargs)
 
 		if not hasattr(self, "context") or not self.context.get("request"):
@@ -86,9 +111,10 @@ class SaneSerializerMixin:
 			self.context["fields"] = self._requested_fields.get(field, {})
 			kwargs["context"] = self.context
 			if isinstance(value, ListSerializer):
-				original_serializer = kwargs.pop("child")
-				kwargs["many"] = True
-				self.fields[field] = type(original_serializer)(*args, **kwargs)
+				child = kwargs.pop("child")
+				kwargs["max_length"] = child._max_length
+				kwargs["child"] = type(child)(*args, **kwargs)
+				self.fields[field] = SaneListSerializer(*args, **kwargs)
 			else:
 				self.fields[field] = type(value)(*args, **kwargs)
 

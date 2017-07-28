@@ -33,7 +33,7 @@ class CommentSerializer(SaneModelSerializer):
 		fields = "__all__"
 
 class ArticleSerializer(SaneModelSerializer):
-	comments = CommentSerializer(many=True)
+	comments = CommentSerializer(many=True, max_length=10)
 	user = UserSerializer()
 
 	def get_readable_fields(self):
