@@ -33,9 +33,6 @@ class CommentSerializer(SaneModelSerializer):
 		fields = "__all__"
 
 class ArticleSerializer(SaneModelSerializer):
-	comments = CommentSerializer(many=True, max_length=10)
-	user = UserSerializer()
-
 	def get_readable_fields(self):
 		return ["title", "body", "user", "created_on", "modified_on", "comments"]
 

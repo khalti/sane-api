@@ -11,27 +11,7 @@ from rest_framework.serializers import \
 		, Field
 		, CharField
 		, JSONField
-		, ListSerializer
 		)
-
-class SaneListSerializer(ListSerializer):
-	def __init__(self, *args, **kwargs):
-		if not kwargs.get("max_length"):
-			raise SaneException("Keyword arg 'max_length' is required for nested serializers with many=True.")
-		self._max_length = kwargs.pop("max_length")
-		super(SaneListSerializer, self).__init__(*args, **kwargs)
-
-	def to_representation(self, data):
-		"""
-		List of object instances -> List of dicts of primitive datatypes.
-		"""
-		# Dealing with nested relationships, data can be a Manager,
-		# so, first get a queryset from the Manager if needed
-		iterable = data.all() if isinstance(data, models.Manager) else data
-
-		return [
-			self.child.to_representation(item) for item in iterable[:self._max_length]
-		]
 
 class PermissionField(Field):
 	def __init__(self, *args, **kwargs):
@@ -54,27 +34,14 @@ class PermissionField(Field):
 
 class SaneSerializerMixin:
 	def __init__(self, *args, **kwargs):
-		if kwargs.get("max_length"):
-			self._max_length = kwargs.pop("max_length")
 		super(SaneSerializerMixin, self).__init__(*args, **kwargs)
 		if not hasattr(self, "context") or not self.context.get("request"):
 			return
 
 		request = self.context.get("request")
-		request_method = request.method.lower()
 		available_fields = set(self.fields.keys())
-		accessible_fields, requested_fields = None, None
-		if request_method == "get":
-			accessible_fields = set(self.get_readable_fields())
-			if "fields" in self.context.keys():
-				fields_str = self.context.get("fields")
-			else:
-				fields_str = request.query_params.get("fields")
-			self._requested_fields = self.normalize_fields_str(fields_str or {})
-			requested_fields = self._requested_fields.keys()
-			self.reinitialize_fields()
-		else:
-			accessible_fields = set(self.get_writable_fields())
+		accessible_fields = self.get_accessible_fields()
+		requested_fields = self.get_requested_fields()
 
 		field_groups = [available_fields, accessible_fields, requested_fields]
 		self.final_fields = set.intersection(*field_groups)
@@ -82,13 +49,32 @@ class SaneSerializerMixin:
 		for field in available_fields - self.final_fields:
 			self.fields.pop(field)
 
+	def get_accessible_fields(self):
+		request_method = self.context["request"].method.lower()
+		if request_method == "get":
+			return set(self.get_readable_fields())
+		else:
+			return set(self.get_writable_fields())
+
+	def get_requested_fields(self):
+		fields_str = self.context["request"].query_params.get("fields")
+		accessible_fields = self.get_accessible_fields()
+		if not fields_str:
+			return accessible_fields
+		return fields_str.split(",")
+		
+
 	def to_representation(self, obj):
 		"""
 		Assign 'None' to inaccessible or unavailable fields.
 		Helps in backwark compatibility.
 		"""
 		data = super(SaneSerializerMixin, self).to_representation(obj)
-		empty_fields = set.difference(set(self._requested_fields.keys()), set(data.keys()))
+
+		if not hasattr(self, "context") or not self.context.get("request"):
+			return data
+
+		empty_fields = set.difference(set(self.get_requested_fields()), set(data.keys()))
 		for field in empty_fields:
 			data[field] = None
 		return data
@@ -100,36 +86,6 @@ class SaneSerializerMixin:
 	def get_writable_fields(self):
 		raise Exception \
 				("Please implement this method and so that it returns different fields for different user/group.")
-
-	def normalize_fields_str(self, fields_str):
-		if type(fields_str) is dict:
-			return fields_str
-
-		fields_str = re.sub(r"{", ":{", fields_str)
-		fields_str = "{" + fields_str + "}"
-		fields_str = re.sub(r"([a-zA-Z0-9_]+)", "\"\\1\"", fields_str)
-		fields_str = re.sub(r'("[a-zA-Z0-9_]+")([,}])', "\\1:null\\2", fields_str)
-		return json.loads(fields_str)
-
-	def reinitialize_fields(self):
-		for field, value in self.fields.items():
-			if isinstance(value, BaseSerializer):
-				self.reinitialize_nested_serializer(field, value)
-
-
-	def reinitialize_nested_serializer(self, field, value):
-		if isinstance(value, BaseSerializer):
-			args = value._args
-			kwargs = value._kwargs
-			self.context["fields"] = self._requested_fields.get(field, {})
-			kwargs["context"] = self.context
-			if isinstance(value, ListSerializer):
-				child = kwargs.pop("child")
-				kwargs["max_length"] = child._max_length
-				kwargs["child"] = type(child)(*args, **kwargs)
-				self.fields[field] = SaneListSerializer(*args, **kwargs)
-			else:
-				self.fields[field] = type(value)(*args, **kwargs)
 
 class SaneSerializer(SaneSerializerMixin, Serializer):
 	pass
