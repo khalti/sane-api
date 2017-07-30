@@ -51,7 +51,7 @@ class HelperAPI(SaneAPI):
 		if type(source) is list:
 			dlist = map\
 					(lambda x: self.get_value_at\
-						(copy.deepcopy(to_walk), x), source)
+						(copy.deepcopy(to_walk), x, start, walked), source)
 			return reduce(lambda x, y: "{},{}".format(x,y), dlist)
 
 		if len(to_walk) == 0:
@@ -78,7 +78,8 @@ class HelperAPI(SaneAPI):
 				path = group.split(".")
 				pattern = "{" + group + "}"
 				try:
-					value = self.get_value_at(copy.deepcopy(path), responses, start=True)
+					value = self.get_value_at\
+							(copy.deepcopy(path), responses, start=True, walked=[])
 					req_sig = json.loads(req_sig_str.replace(pattern, str(value)))
 				except KeyError:
 					return None
