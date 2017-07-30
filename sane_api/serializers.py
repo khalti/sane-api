@@ -62,7 +62,6 @@ class SaneSerializerMixin:
 		if not fields_str:
 			return accessible_fields
 		return fields_str.split(",")
-		
 
 	def to_representation(self, obj):
 		"""

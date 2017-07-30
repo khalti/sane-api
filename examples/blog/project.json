@@ -1,7 +1,6 @@
 {
   "dependencies": [
-    "django-rest-framework==0.1.0",
-    "django==1.11.3",
+    "django_filters==0.2.1",
     "django-filter==1.0.4"
   ],
   "dev-dependencies": []

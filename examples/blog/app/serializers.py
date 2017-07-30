@@ -34,7 +34,7 @@ class CommentSerializer(SaneModelSerializer):
 
 class ArticleSerializer(SaneModelSerializer):
 	def get_readable_fields(self):
-		return ["title", "body", "user", "created_on", "modified_on", "comments"]
+		return ["id", "title", "body", "user", "created_on", "modified_on", "comments"]
 
 	class Meta:
 		model = Article
