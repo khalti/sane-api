@@ -6,7 +6,7 @@ setup () {
 	virtualenv --python=python3 .env
 	source .env/bin/activate
 	pip install pipx
-	px -d setup
+	px setup -d
 }
 
 init () {
