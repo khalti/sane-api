@@ -1,6 +1,12 @@
 from django.test import TestCase
 
-from sane_api.helpers import get_cyclic_dependency, get_unmet_dependency
+from sane_api.helpers import \
+		( get_cyclic_dependency
+		, get_unmet_dependency
+		, get_value_at
+		, fill_template
+		)
+from sane_api.exceptions import UnmetDependency
 
 
 class TestHasCyclicDependency(TestCase):
@@ -39,3 +45,59 @@ class TestHasUnmetDependency(TestCase):
 				}
 		assert get_unmet_dependency(data) == None, \
 				"Returns None if has no unmet dependency."
+
+class TestGetValueAt(TestCase):
+	def test1(self):
+		path = ["user", "id"]
+		source = { "user": {"id": 1}}
+		assert get_value_at(path, source, start=True) == 1, \
+				"It returns value from single object at given path."
+
+	def test2(self):
+		path = ["user", "id"]
+		source = \
+				[
+					{ "user": {"id": 1}},
+					{ "user": {"id": 2}}
+				]
+		assert get_value_at(path, source, start=True) == "1,2", "It return value from list at given path."
+
+		path = ["user", "id"]
+		source = { "user": [{"id": 1}, {"id": 2}]}
+		assert get_value_at(path, source, start=True) == "1,2", "It return value from list at given path."
+
+	def test3(self):
+		path = ["user", "username"]
+		source = { "user": {"id": 1}}
+		try:
+			get_value_at(path, source, start=True)
+			assert 0, "It should have thrown UnmetDependency."
+		except UnmetDependency:
+			pass
+
+class TestFillTemplate(TestCase):
+	def test1(self):
+		req_sig = \
+				{ "url": "/api/comment/"
+				, "query": {"user": "{user.id}", "article": "{article.id}"}
+				}
+		source = { "user": [{"id": 1}, {"id": 2}], "article": {"id": 1}}
+		expected = \
+				{ "url": "/api/comment/"
+				, "query": {"user": "1,2", "article": "1"}
+				}
+		assert fill_template(req_sig, source) == expected, \
+				"It fills the template and returns filled request signature."
+
+	def test2(self):
+		req_sig = \
+				{ "url": "/api/comment/"
+				, "query": {"user": "{user.id}", "article": "{x.id}"}
+				}
+		source = { "user": [{"id": 1}, {"id": 2}], "article": {"id": 1}}
+		expected = \
+				{ "url": "/api/comment/"
+				, "query": {"user": "1,2", "article": "1"}
+				}
+		assert fill_template(req_sig, source) == None, \
+				"It returns None template could not be filled due to unresolved dependency."

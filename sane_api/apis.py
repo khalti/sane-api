@@ -1,6 +1,5 @@
 import copy
 import re
-from functools import reduce
 import ast
 import json
 
@@ -12,6 +11,11 @@ from rest_framework.test import APIClient
 
 from sane_api.serializers import CompositeRequestSerializer
 from sane_api.exceptions import SaneException, CyclicDependency, UnmetDependency
+from sane_api.helpers import \
+		( get_cyclic_dependency
+		, get_unmet_dependency
+		, make_requests
+		)
 
 
 class SanePermissionClass:
@@ -47,106 +51,31 @@ class SaneAPI(SaneAPIMixin, ViewSet):
 
 
 class HelperAPI(SaneAPI):
-	def get_value_at(self, to_walk, source, start=False, walked=[]):
-		if type(source) is list:
-			dlist = map\
-					(lambda x: self.get_value_at\
-						(copy.deepcopy(to_walk), x, start, walked), source)
-			return reduce(lambda x, y: "{},{}".format(x,y), dlist)
-
-		if len(to_walk) == 0:
-			return source
-
-		this_path = to_walk.pop(0)
-		walked.append(this_path)
-		if start and not self.request.data.get(this_path):
-			raise UnmetDependency(walked)
-
-		try:
-			return self.get_value_at\
-					(to_walk, source[this_path], walked=walked)
-		except KeyError as e:
-			if not start:
-				raise UnmetDependency(walked)
-			raise e
-
-	def fill_template(self, req_sig, responses):
-		req_sig_str = json.dumps(req_sig)
-		match = re.search(r"{([a-zA-Z0-9\.]+)}", req_sig_str)
-		if match:
-			for group in match.groups():
-				path = group.split(".")
-				pattern = "{" + group + "}"
-				try:
-					value = self.get_value_at\
-							(copy.deepcopy(path), responses, start=True, walked=[])
-					req_sig = json.loads(req_sig_str.replace(pattern, str(value)))
-				except KeyError:
-					return None
-
-		return req_sig
-
-	def get_sub_requests(self, requests, responses, pendings):
-		if len(requests) == 0:
-			return responses
-
-		key, req_sig = requests.pop(0)
-		processed_sig = self.fill_template(req_sig, responses)
-		if not processed_sig:
-			pendings.append(key)
-			requests.append([key, req_sig])
-		else:
-			s = CompositeRequestSerializer(data = processed_sig)
-			if not s.is_valid():
-				responses[key] = s.errors
-
-			response = self.client.get \
-					( s.validated_data["url"]
-					, s.validated_data.get("query", {})
-					, format="json"
-					)
-
-			responses[key] = response.json() if response.status_code == 200 else None
-
-		return self.get_sub_requests(requests, responses, pendings)
-
-	def walk(self, key, requests, dependents):
-		occurances = filter(lambda dependent: dependent == key, dependents)
-		if len(list(occurances)) > 2:
-			raise CyclicDependency(key)
-
-		try:
-			match = re.search(r"{([a-zA-Z0-9_.]+?)}", json.dumps(requests[key]))
-		except KeyError:
-			raise UnmetDependency([key])
-
-		if not match:
-			return
-		dependents.append(key)
-		for group in match.groups():
-			self.walk(group.split(".")[0], requests, dependents)
-
-	def check_cyclic_dependency(self, requests):
-		for key, value in requests.items():
-			self.walk(key, requests, dependents=[])
-
 	@list_route(methods=["post"])
 	def compose(self, request):
-		try:
-			self.check_cyclic_dependency(request.data)
-		except SaneException as e:
-			return Response({"detail": e.message}, status=400)
+		data = request.data
 
-		self.client = APIClient()
+		# check for cyclic and unmet dependencies
+		cyclic_dependency = get_cyclic_dependency(data)
+		if cyclic_dependency:
+			msg = "'{}' has cyclic dependency.".format(cyclic_dependency)
+			return Response({"detail": msg}, status = 400)
+		unmet_dependency = get_unmet_dependency(data)
+		if unmet_dependency:
+			msg =  "'{}' has unmet dependency '{}'.".format(unmet_dependency[0], unmet_dependency[1])
+			return Response({"detail": msg}, status = 400)
+
+		# authenticate if user exists
+		client = APIClient()
 		if request.user and request.user.is_authenticated():
 			client.force_authenticate(request.user)
 
-		requests = []
+		request_signatures = []
 		for key, value in request.data.items():
 			requests.append([key, value])
 
 		try:
-			responses = self.get_sub_requests(requests, responses={}, pendings=[])
+			responses = make_requests(self.client, request_signatures)
 		except SaneException as e:
 			return Response({"detail": e.message}, status=400)
 		return Response(responses, status=200)
