@@ -4,13 +4,18 @@ import copy
 from functools import reduce
 
 from sane_api.exceptions import UnmetDependency
+from sane_api.serializers import CompositeRequestSerializer
 
 
 def has_cyclic_dependency(data, entry_key, this_key):
 	if entry_key == this_key:
 		return True
 
-	value = data[this_key or entry_key]
+	try:
+		value = data[this_key or entry_key]
+	except KeyError:
+		# will be handled by unmet dependency check
+		return False
 	matches = re.findall(r"{([a-zA-Z0-9_.]+?)}", json.dumps(value))
 	for match in matches:
 		next_key = match.split(".")[0]
@@ -82,7 +87,7 @@ def fill_template(req_sig, responses):
 
 	return req_sig
 
-def make_requests(client, req_sigs, response={}, pendings=[]):
+def make_requests(client, req_sigs, responses={}, pendings=[]):
 	if len(req_sigs) == 0:
 		return responses
 
@@ -96,7 +101,7 @@ def make_requests(client, req_sigs, response={}, pendings=[]):
 		if not s.is_valid():
 			responses[key] = s.errors
 
-		response = self.client.get \
+		response = client.get \
 				( s.validated_data["url"]
 				, s.validated_data.get("query", {})
 				, format="json"
@@ -104,7 +109,7 @@ def make_requests(client, req_sigs, response={}, pendings=[]):
 
 		responses[key] = response.json() if response.status_code == 200 else None
 
-	return make_requests(requests, responses, pendings)
+	return make_requests(client, req_sigs, responses, pendings)
 
 def make_nested_requests():
 	pass

@@ -72,10 +72,10 @@ class HelperAPI(SaneAPI):
 
 		request_signatures = []
 		for key, value in request.data.items():
-			requests.append([key, value])
+			request_signatures.append([key, value])
 
 		try:
-			responses = make_requests(self.client, request_signatures)
+			responses = make_requests(client, request_signatures, responses={}, pendings=[])
 		except SaneException as e:
 			return Response({"detail": e.message}, status=400)
 		return Response(responses, status=200)

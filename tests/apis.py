@@ -153,42 +153,69 @@ class TestHelperAPI(APITestCase):
 		from tests.urls import urlpatterns
 		from rest_framework import routers
 
-		class LocationAPI(SaneAPI):
+		class BlogAPI(SaneAPI):
 			@list_route(methods=["get"])
-			def location1(self, request):
-				data = { "id": 1 , "name": "location 1" }
-				return Response(data, status=200)
-
-			def can_location1(self, user, request):
-				return True
-
-			@list_route(methods=["get"])
-			def location2(self, request):
+			def user(self, request):
 				data = \
 						[
-								{ "id": 2, "name": "location 2", "parent": 1},
-								{ "id": 3, "name": "location 2", "parent": 2},
-								{ "id": 4, "name": "location 2", "parent": 1},
+							{ "id": 1 , "name": "user1" },
+							{ "id": 2 , "name": "user2" },
+							{ "id": 3 , "name": "user3" },
 						]
-				parent = request.query_params.get("parent")
-				if parent:
-					filtered_data = filter(lambda adata: parent == str(adata["parent"]), data)
+				user_id = request.query_params.get("id")
+				if user_id:
+					filtered_data = list(filter(lambda adata: str(adata["id"]) == user_id, data))
 				else:
-					filtered_data = []
+					filtered_data = data
 				return Response(filtered_data, status=200)
 
-			def can_location2(self, user, request):
+			def can_user(self, user, request):
 				return True
 
 			@list_route(methods=["get"])
-			def location3(self, request):
-				return Response(request.query_params.get("id", []), status=200)
+			def article(self, request):
+				data = \
+						[
+								{ "id": 1, "user": 1, "title": "article1"},
+								{ "id": 2, "user": 1, "title": "article2"},
+								{ "id": 3, "user": 2, "title": "article3"},
+						]
+				user = request.query_params.get("user")
+				if user:
+					filtered_data = \
+							list(filter(lambda adata: str(adata["user"]) in user.split(","), data))
+				else:
+					filtered_data = data
+				return Response(filtered_data, status=200)
 
-			def can_location3(self, user, request):
+			def can_article(self, user, request):
+				return True
+
+			@list_route(methods=["get"])
+			def comment(self, request):
+				data = \
+						[
+								{ "id": 1, "user": 1, "article": 1, "title": "comment1"},
+								{ "id": 2, "user": 1, "article": 2, "title": "comment2"},
+								{ "id": 3, "user": 2, "article": 3, "title": "comment3"},
+						]
+
+				user = request.query_params.get("user")
+				article = request.query_params.get("article")
+
+				filtered_data = \
+						list(filter(
+								lambda adata: \
+										str(adata["user"]) in user.split(",") \
+										and str(adata["article"]) in article.split(",")
+										, data))
+				return Response(filtered_data, status = 200)
+
+			def can_comment(self, user, request):
 				return True
 
 		router = routers.SimpleRouter()
-		router.register("location", LocationAPI, base_name="location")
+		router.register("blog", BlogAPI, base_name="blog")
 		router.register("helper", HelperAPI, base_name="helper")
 
 		urlpatterns.extend(router.urls)
@@ -201,17 +228,23 @@ class TestHelperAPI(APITestCase):
 		from django.core.urlresolvers import reverse
 
 		payload = \
-				{ "location1": {"url": "/location/location1/"}
-				, "location2": {"url": "/location/location2/"}
-				, "location3": {"url": "/location/location3/"}
+				{ "user": {"url": "/blog/user/"}
+				, "article": {"url": "/blog/article/"}
 				}
 		url = reverse("helper-compose")
 		response = self.client.post(url, payload, format="json")	
 
 		expected = \
-				{ "location1":{"id":1,"name":"location 1"}
-				, "location2":[]
-				, "location3":[]
+				{ "user": [
+						{ "id": 1 , "name": "user1" },
+						{ "id": 2 , "name": "user2" },
+						{ "id": 3 , "name": "user3" },
+					]
+					, "article": [
+							{ "id": 1, "user": 1, "title": "article1"},
+							{ "id": 2, "user": 1, "title": "article2"},
+							{ "id": 3, "user": 2, "title": "article3"}
+					]
 				}
 		assert response.json() == expected, "It works for urls without dependency."
 
@@ -220,26 +253,31 @@ class TestHelperAPI(APITestCase):
 		from django.core.urlresolvers import reverse
 
 		payload = \
-				{ "location1": {"url": "/location/location1/"}
-				, "location2": \
-						{ "url": "/location/location2/"
-						, "query": {"parent": "{location1.id}"}
+				{ "user": {"url": "/blog/user/", "query": {"id": 1}}
+				, "article": \
+						{ "url": "/blog/article/"
+						, "query": {"user": "{user.id}"}
 						}
-				, "location3": \
-						{ "url": "/location/location3/"
-						, "query": {"id": "{location2.id}"}
+				, "comment": \
+						{ "url": "/blog/comment/"
+						, "query": {"article": "{article.id}", "user": "{user.id}"}
 						}
 				}
 		url = reverse("helper-compose")
 		response = self.client.post(url, payload, format="json")	
 
 		expected = \
-				{ "location1":{"id":1,"name":"location 1"}
-				, "location2":[
-						{ "id": 2, "name": "location 2", "parent": 1},
-						{ "id": 4, "name": "location 2", "parent": 1},
+				{ "user": [
+						{ "id": 1 , "name": "user1" }
 					]
-				, "location3": "2,4"
+				, "article": [
+						{ "id": 1, "user": 1, "title": "article1"},
+						{ "id": 2, "user": 1, "title": "article2"},
+					]
+				, "comment": [
+						{ "id": 1, "user": 1, "article": 1, "title": "comment1"},
+						{ "id": 2, "user": 1, "article": 2, "title": "comment2"},
+					]
 				}
 		assert response.json() == expected, "It works for urls with dependency."
 
@@ -248,31 +286,31 @@ class TestHelperAPI(APITestCase):
 		from django.core.urlresolvers import reverse
 
 		payload = \
-				{ "location1": {"url": "/location/location1/"}
-				, "location2": \
-						{ "url": "/location/location2/"
-						, "query": {"parent": "{location3.id}"}
+				{ "user": {"url": "/blog/user/"}
+				, "article": \
+						{ "url": "/blog/article/"
+						, "query": {"parent": "{comment.id}"}
 						}
-				, "location3": \
-						{ "url": "/location/location3/"
-						, "query": {"id": "{location2.id}"}
+				, "comment": \
+						{ "url": "/blog/comment/"
+						, "query": {"id": "{article.id}"}
 						}
 				}
 		url = reverse("helper-compose")
 		response = self.client.post(url, payload, format="json")	
 
 		assert response.status_code == 400, "It complains if urls have cyclic dependency."
-		assert "location2" or "location3" in response.json()["detail"]
+		assert "article" or "comment" in response.json()["detail"]
 
 
 	def test_compose4(self):
 		from django.core.urlresolvers import reverse
 
 		payload = \
-				{ "location1": {"url": "/location/location1/"}
-				, "location2": \
-						{ "url": "/location/location2/"
-						, "query": {"parent": "{location3.id}"}
+				{ "user": {"url": "/blog/user/"}
+				, "article": \
+						{ "url": "/blog/article/"
+						, "query": {"comment": "{comment.id}"}
 						}
 				}
 		url = reverse("helper-compose")
@@ -280,17 +318,17 @@ class TestHelperAPI(APITestCase):
 
 		assert response.status_code == 400, \
 				"It complains if a url has unmet dependecy at root level."
-		assert "location3" in response.json()["detail"]
+		assert "comment" in response.json()["detail"]
 
 
 	def test_compose5(self):
 		from django.core.urlresolvers import reverse
 
 		payload = \
-				{ "location1": {"url": "/location/location1/"}
-				, "location2": \
-						{ "url": "/location/location2/"
-						, "query": {"parent": "{location1.nokey}"}
+				{ "user": {"url": "/blog/user/"}
+				, "article": \
+						{ "url": "/blog/article/"
+						, "query": {"user": "{user.nokey}"}
 						}
 				}
 		url = reverse("helper-compose")
@@ -298,5 +336,5 @@ class TestHelperAPI(APITestCase):
 
 		assert response.status_code == 400, \
 				"It complains if a url has unmet dependecy at sub level."
-		assert "location1.nokey" in response.json()["detail"]
+		assert "user.nokey" in response.json()["detail"]
 
