@@ -1,22 +1,31 @@
-Project is still flux.
+> Project is still flux.
 
 ## Introduction
-sane-api
+Sane API is an opinionated, secure and scalable framework built on top of `Django REST Framework`.
 
 ## Features
 - secure by default apis
 - field level serialization control
 - field level filteration control
-- composible apis (hit multiple apis at once)
+- composable apis (hit multiple apis at once)
 
 ## View
-Sane api inforces action level authentication. It provides `SaneAPI` and `SaneModelAPI`.
+### Problems
+1. permission management is complex and hard
+2. accidental expose of api
+
+### Solution
+1. implement action based permissions
+2. make apis inaccessible by default
+
+Sane API enforces action level authentication. It provides `SaneAPI` and `SaneModelAPI`.
 Extend `SaneModelAPI` and `SaneAPI` for viewsets which have and do not have `queryest` respectively.
 `By default every actions of viewset that extends them are inaccisible.`
 So that even if one forgets to implement authentication logics for the actions, they do not
 get exposed.
 
 There are two level of authorization:
+
 To illustrate the concepts lets take following code as an example.
 
 ```python
@@ -48,11 +57,18 @@ In the example above an article can only be updated if `can_update` authorizer a
 model returns `True`.
 
 ## Serializer
+### Problems
+- different users/groups have different level of access to readable and writable fields
+- maintaining multiple serializers for different users/groups or apis is complex and difficult to maintain
+
+### Solution
+- let serializer return readable and writable fields based upon users/groups.
+
 Every new serializer must extend `SaneSerializer` or `SaneModelSerializer`.
 Extend `SaneModelSerializer` for serializing model instances else extend `SaneSerializer`.
 
 Every new serializer must implement `get_readable_fields` and `get_writable_fields` else
-`Sane api` will throw an exception complaning about it.
+`Sane api` will complain about it.
 
 ### get_readable_fields
 This method must conditionally return readable fields.
@@ -91,6 +107,13 @@ class ArticleSerializer(SaneModelSerializer):
 ```
 
 ## Filter
+### Problem
+- different users/groups have different level of filtration access
+- implementing multiple filter classes for user/groups is complex and difficult to maintain
+
+### Solution
+- allow developer to return filteration 
+
 Sane api provides `SaneFilterSet`. One must implement `get_filterables` to return differnt
 filterset for different user/group.
 
@@ -117,5 +140,36 @@ class ArticleFilterSet(SaneFilterSet):
 ```
 
 ## Composite api
-- independent compose
-- dependent compose
+### Problem
+- making multiple network calls is inefficient and hard for clients to handle
+
+### Solution
+- facilitate client to fetch data from multiple apis through single api request
+
+With `Sane API` one can fetch data from multiple apis through single request using `HelperAPI.compose()` action.
+It must be hooked to `DRF` router before use.
+
+There are two ways compose apis:
+
+### 1. Dependent apis
+Imagine a situation where one need to fetch list of users and their articles.
+In this situation, articles are dependent to the users. Below is the example to fetch
+dependent data.
+
+```python
+import requests
+
+url = "http://somewhere.com/api/compose/"
+payload = {
+	"user": {"url": "http://somewhere.com/api/user/"},
+	"article": {
+		"url": "http://somewhere.com/api/article/",
+		"params": {"user": "{{user.id}}"}
+		}
+}
+response = requests.post(url, payload)
+# response.data == {user: [...], article: [...]}
+```
+
+### 2. Independent apis
+...
